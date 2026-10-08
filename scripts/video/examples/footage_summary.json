@@ -1,0 +1,18 @@
+{
+  "_note": "docs/videos/kumawatch_patrol_gazebo_rviz_demo.mp4 の最後に端末へ出た結果(撮影時の patrol_summary.json 相当)",
+  "strategy": "utility",
+  "model": "logistic_regression_v1",
+  "route": ["P2", "P4", "P3"],
+  "num_points": 3,
+  "num_arrived": 1,
+  "num_checked": 3,
+  "bears_found": 2,
+  "distance_m": 32.8,
+  "duration_s": 163.8,
+  "results": [
+    {"point_id": "P2", "status": "bear_found", "risk": 0.847},
+    {"point_id": "P4", "status": "bear_found", "risk": 0.905},
+    {"point_id": "P3", "status": "clear", "risk": 0.737}
+  ],
+  "events": []
+}

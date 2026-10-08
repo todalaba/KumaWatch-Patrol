@@ -1,0 +1,82 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-22.04
+    container: ros:humble-ros-base-jammy
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ros-humble-nav2-msgs ros-humble-tf2-ros-py ros-humble-visualization-msgs \
+            ros-humble-lifecycle-msgs ros-humble-nav-msgs ros-humble-gazebo-msgs \
+            python3-colcon-common-extensions python3-pytest python3-yaml python3-numpy
+
+      - name: Unit tests (ROS-independent)
+        run: python3 -m pytest -q src
+
+      - name: colcon build
+        run: |
+          source /opt/ros/humble/setup.bash
+          colcon build --symlink-install --event-handlers console_direct-
+
+      - name: Dry run (fake_nav2) - AI route and fixed route
+        env:
+          ROS_LOCALHOST_ONLY: "1"
+        run: |
+          source install/setup.bash
+          for s in utility fixed; do
+            timeout 120 ros2 launch kumawatch_mission dry_run.launch.py time_scale:=8.0 strategy:=$s \
+              > dry_run_$s.log 2>&1 || true
+            grep -A12 "巡回結果" dry_run_$s.log || (cat dry_run_$s.log; exit 1)
+          done
+          python3 - <<'PY'
+          import glob, json
+          got = {}
+          for path in glob.glob('/root/kumawatch_patrol_output/*/patrol_summary.json') + \
+                  glob.glob('/github/home/kumawatch_patrol_output/*/patrol_summary.json'):
+              s = json.load(open(path, encoding='utf-8'))
+              got[s['strategy']] = s
+          print({k: (v['route'], v['bears_found']) for k, v in got.items()})
+          assert got['utility']['route'] == ['P2', 'P4', 'P3'], got['utility']['route']
+          assert got['utility']['bears_found'] == 2
+          assert got['fixed']['route'] == ['P1', 'P2', 'P3']
+          assert got['fixed']['bears_found'] == 1
+          PY
+
+      - name: Dry run - retreat after a bear, mission event log
+        env:
+          ROS_LOCALHOST_ONLY: "1"
+        run: |
+          source install/setup.bash
+          timeout 120 ros2 launch kumawatch_mission dry_run.launch.py time_scale:=8.0 on_bear:=retreat \
+            > dry_run_retreat.log 2>&1 || true
+          grep -A12 "巡回結果" dry_run_retreat.log || (cat dry_run_retreat.log; exit 1)
+          python3 - <<'PY'
+          import csv, glob, os
+          runs = sorted(glob.glob('/root/kumawatch_patrol_output/*_utility') +
+                        glob.glob('/github/home/kumawatch_patrol_output/*_utility'), key=os.path.getmtime)
+          rows = list(csv.DictReader(open(os.path.join(runs[-1], 'mission_events.csv'), encoding='utf-8')))
+          kinds = [r['event'] for r in rows]
+          print(kinds)
+          assert kinds.count('bear_detected') == 2 and kinds.count('retreat_done') == 2, kinds
+          assert kinds[0] == 'mission_started' and kinds[-1] == 'mission_completed'
+          assert os.path.exists(os.path.join(runs[-1], 'trajectory.csv'))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dry-run-logs
+          path: dry_run_*.log

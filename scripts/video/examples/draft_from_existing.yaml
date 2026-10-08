@@ -1,0 +1,133 @@
+# 既存の画面録画(docs/videos/kumawatch_patrol_gazebo_rviz_demo.mp4、3440×1440)を
+# 再編集した「構成見本」。リポジトリのルートで次の順に実行する:
+#
+#   python3 scripts/video/make_cards.py --out video_work/cards_draft \
+#       --risk-csv src/kumawatch_ai/data/simulated_risk_scores.csv \
+#       --summary scripts/video/examples/footage_summary.json
+#   python3 scripts/video/compose.py scripts/video/examples/draft_from_existing.yaml
+#
+# この録画は旧設定(模擬データのリスク・既知の位置による熊の判定)で撮ったため、
+# 字幕の数値もその設定に合わせている。最終版は docs/video_plan.md の手順で撮り直す。
+# 時刻は元動画の秒(start/end)。captions / beeps の時刻は各場面の仕上がりの秒。
+
+output: ../../../video_work/KumaWatch_Patrol_draft_v2.mp4
+fps: 30
+segments:
+  - {name: タイトル, image: ../../../video_work/cards_draft/01_title.png, duration: 7}
+  - {name: 背景, image: ../../../video_work/cards_draft/02_background.png, duration: 7}
+  - {name: AIの判断, image: ../../../video_work/cards_draft/03_ai_risk.png, duration: 12}
+  - {name: システム構成, image: ../../../video_work/cards_draft/04_system.png, duration: 7}
+
+  - name: ROS 2 で起動(全画面)
+    video: ../../../docs/videos/kumawatch_patrol_gazebo_rviz_demo.mp4
+    start: 8.0
+    end: 13.0
+    layers:
+      - {crop: [0, 120, 3440, 1250], box: [0, 120, 1920, 960]}
+    captions:
+      - {style: mission, text: ["ROS 2 で起動", "左：端末　中央：Gazebo（シミュレーション）　右：RViz（地図・経路・AI リスク）"]}
+
+  - name: P2 へ自律走行
+    video: ../../../docs/videos/kumawatch_patrol_gazebo_rviz_demo.mp4
+    start: 13.0
+    end: 56.5
+    speed: 3.0
+    layers: &patrol
+      - {crop: [1033, 240, 1075, 685], box: [20, 120, 1140, 870]}
+      - {crop: [2620, 235, 792, 820], box: [1170, 120, 730, 870]}
+    captions:
+      - {style: mission, text: ["Mission 1/3: P2 林縁 (Forest edge)", "AI risk 0.85  |  Navigating"]}
+      - {style: badge, text: "3× Speed"}
+      - {style: label, text: "Gazebo", pos: [40, 134]}
+      - {style: label, text: "RViz", pos: [1190, 134]}
+      - {style: lower, at: 0, dur: 6, text: ["AI が選んだ 1 番目の地点 P2（林縁）へ自律走行", "Navigation2 が経路（RViz の青線）を計画し、障害物を避けて進む"]}
+
+  - name: 熊を検知(P2)
+    video: ../../../docs/videos/kumawatch_patrol_gazebo_rviz_demo.mp4
+    start: 56.5
+    end: 66.0
+    layers: &zoom_p2
+      - {crop: [1265, 325, 360, 229], box: [20, 120, 1140, 870]}
+      - {crop: [2620, 235, 792, 820], box: [1170, 120, 730, 870]}
+    captions:
+      - {style: mission, at: 0, dur: 3.0, text: ["Mission 1/3: P2 林縁 (Forest edge)", "AI risk 0.85  |  Navigating"]}
+      - {style: mission, at: 3.0, text: ["Mission 1/3: P2 林縁 (Forest edge)", "BEAR - stopped  |  位置・時刻を記録"]}
+      - {style: label, text: "Gazebo（P2 付近を拡大）", pos: [40, 134]}
+      - {style: alert, at: 3.0, dur: 6.0, center_x: 590, text: ["BEAR DETECTED", "Confidence: 1.00   Distance: 2.5 m", "Location: Patrol point P2", "Action: Stop and report"]}
+      - {style: label, at: 3.0, dur: 6.0, text: "判定：既知の位置（旧設定の映像）", pos: [1180, 1000]}
+    beeps: [3.0]
+
+  - name: P4 へ
+    video: ../../../docs/videos/kumawatch_patrol_gazebo_rviz_demo.mp4
+    start: 66.0
+    end: 97.0
+    speed: 3.0
+    layers: *patrol
+    captions:
+      - {style: mission, text: ["Mission 2/3: P4 ごみ集積所 (Garbage station)", "AI risk 0.91  |  Navigating"]}
+      - {style: badge, text: "3× Speed"}
+      - {style: lower, at: 0, dur: 4, text: ["停止・記録のあと、2 番目の地点 P4（ごみ集積所）へ"]}
+
+  - name: 熊を検知(P4)
+    video: ../../../docs/videos/kumawatch_patrol_gazebo_rviz_demo.mp4
+    start: 97.0
+    end: 106.0
+    layers:
+      - {crop: [1550, 345, 360, 229], box: [20, 120, 1140, 870]}
+      - {crop: [2620, 235, 792, 820], box: [1170, 120, 730, 870]}
+    captions:
+      - {style: mission, at: 0, dur: 2.5, text: ["Mission 2/3: P4 ごみ集積所 (Garbage station)", "AI risk 0.91  |  Navigating"]}
+      - {style: mission, at: 2.5, text: ["Mission 2/3: P4 ごみ集積所 (Garbage station)", "BEAR - stopped  |  位置・時刻を記録"]}
+      - {style: label, text: "Gazebo（P4 付近を拡大）", pos: [40, 134]}
+      - {style: alert, at: 2.5, dur: 6.0, center_x: 590, text: ["BEAR DETECTED", "Confidence: 1.00   Distance: 2.5 m", "Location: Patrol point P4", "Action: Stop and report"]}
+      - {style: label, at: 2.5, dur: 6.0, text: "判定：既知の位置（旧設定の映像）", pos: [1180, 1000]}
+    beeps: [2.5]
+
+  - name: P3 へ
+    video: ../../../docs/videos/kumawatch_patrol_gazebo_rviz_demo.mp4
+    start: 106.0
+    end: 127.0
+    speed: 3.0
+    layers: *patrol
+    captions:
+      - {style: mission, text: ["Mission 3/3: P3 通学路 (School route)", "AI risk 0.74  |  Navigating"]}
+      - {style: badge, text: "3× Speed"}
+
+  - name: P3 に到着
+    video: ../../../docs/videos/kumawatch_patrol_gazebo_rviz_demo.mp4
+    start: 127.0
+    end: 132.0
+    layers: *patrol
+    captions:
+      - {style: mission, text: ["Mission 3/3: P3 通学路 (School route)", "Arrived - observing"]}
+      - {style: lower, text: ["P3（通学路）に到着 → 周囲を確認：熊なし"]}
+
+  - name: 詰所へ帰還
+    video: ../../../docs/videos/kumawatch_patrol_gazebo_rviz_demo.mp4
+    start: 132.0
+    end: 178.0
+    speed: 4.0
+    layers: *patrol
+    captions:
+      - {style: mission, text: ["KumaWatch Patrol", "Returning to base  |  bears 2"]}
+      - {style: badge, text: "4× Speed"}
+      - {style: lower, at: 0, dur: 4, text: ["3 地点を確認し、詰所へ帰還"]}
+
+  - name: RViz の結果
+    video: ../../../docs/videos/kumawatch_patrol_gazebo_rviz_demo.mp4
+    start: 178.5
+    end: 185.0
+    layers:
+      - {crop: [2620, 235, 792, 820], box: [360, 120, 1200, 900]}
+    captions:
+      - {style: mission, text: ["Mission completed", "3/3 points checked  |  bears 2"]}
+      - {style: lower, text: ["RViz：赤＝熊を見つけた位置、橙の線＝走行軌跡、青線＝計画ルート"]}
+
+  - {name: 結果, image: ../../../video_work/cards_draft/09_result.png, duration: 7}
+  - name: 比較アニメーション
+    video: ../../../video_work/compare_routes.mp4
+    start: 0
+    end: 16
+    size: [1920, 1080]
+  - {name: 比較の表, image: ../../../video_work/cards_draft/08_compare.png, duration: 8}
+  - {name: まとめ, image: ../../../video_work/cards_draft/10_closing.png, duration: 6}

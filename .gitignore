@@ -1,0 +1,11 @@
+build/
+install/
+log/
+__pycache__/
+*.pyc
+.pytest_cache/
+output/
+datasets/
+runs/
+*.pt.tmp
+video_work/

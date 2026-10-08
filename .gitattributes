@@ -1,0 +1,11 @@
+# Windows で clone しても改行を LF のままにする(シェルスクリプトが "bash\r" で動かなくなるのを防ぐ)
+* text=auto eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+*.pt binary
+*.png binary
+*.jpg binary
+*.mp4 binary
+*.pdf binary
+*.docx binary
+*.pgm binary

@@ -1,0 +1,95 @@
+# KumaWatch Patrol のシミュレーション世界(架空の山林と住宅地の境界)
+#
+# このファイルが Gazebo ワールドと Nav2 用の地図の唯一の定義元。変更したら
+#   python3 scripts/generate_world.py
+# で worlds/kumawatch_patrol.world と kumawatch_navigation/maps/kumawatch_map.* を再生成する。
+#
+# 座標系: map = Gazebo world 原点。x=東, y=北 [m]。範囲 x,y ∈ [-10, 10]。
+#   北側: 林 / 南西: 住宅地 / 南東: 学校 / 東端: 河川(柵あり) / 中央: 通学路・道路
+
+bounds: {x_min: -10.0, x_max: 10.0, y_min: -10.0, y_max: 10.0}
+wall: {thickness: 0.2, height: 1.0}
+map_resolution: 0.05
+
+# 地面の塗り分け(見た目のみ、衝突なし)
+surfaces:
+  - {name: forest_floor, x_min: -10.0, x_max: 8.3, y_min: 4.8, y_max: 10.0, color: [0.16, 0.30, 0.12]}
+  - {name: road, x_min: -10.0, x_max: 8.3, y_min: -6.0, y_max: -5.0, color: [0.30, 0.30, 0.32]}
+  - {name: school_route, x_min: 2.5, x_max: 3.5, y_min: -5.0, y_max: 3.0, color: [0.75, 0.62, 0.30]}
+  - {name: river, x_min: 8.5, x_max: 10.0, y_min: -10.0, y_max: 10.0, color: [0.15, 0.35, 0.70]}
+  - {name: base_pad, x_min: -0.6, x_max: 0.6, y_min: -9.1, y_max: -7.9, color: [0.20, 0.40, 0.80]}
+
+# 建物(衝突あり、地図に反映)
+buildings:
+  - {name: house_1, x: -7.5, y: -8.2, size_x: 3.0, size_y: 2.2, height: 2.5, yaw: 0.0, color: [0.85, 0.80, 0.70], roof_color: [0.55, 0.20, 0.15]}
+  - {name: house_2, x: -3.5, y: -8.2, size_x: 2.4, size_y: 2.2, height: 2.5, yaw: 0.0, color: [0.80, 0.82, 0.85], roof_color: [0.20, 0.25, 0.45]}
+  - {name: house_3, x: -7.5, y: -2.8, size_x: 3.0, size_y: 2.2, height: 2.5, yaw: 0.0, color: [0.90, 0.85, 0.75], roof_color: [0.35, 0.35, 0.35]}
+  - {name: house_4, x: -3.5, y: -2.8, size_x: 2.4, size_y: 2.2, height: 2.5, yaw: 0.0, color: [0.85, 0.75, 0.65], roof_color: [0.55, 0.20, 0.15]}
+  - {name: school, x: 6.0, y: -8.3, size_x: 3.5, size_y: 2.4, height: 3.0, yaw: 0.0, color: [0.92, 0.92, 0.88], roof_color: [0.30, 0.45, 0.30]}
+
+# 樹木(幹は衝突あり、樹冠は見た目のみ)
+tree: {trunk_radius: 0.18, trunk_height: 1.6, canopy_radius: 0.8}
+trees:
+  - [-9.34, 5.39]
+  - [-7.08, 5.34]
+  - [-1.57, 5.56]
+  - [0.46, 5.35]
+  - [2.74, 5.80]
+  - [4.50, 5.43]
+  - [6.90, 5.87]
+  - [-8.34, 7.04]
+  - [-6.02, 6.83]
+  - [-4.11, 6.97]
+  - [-2.68, 6.87]
+  - [-0.55, 7.29]
+  - [1.34, 7.15]
+  - [3.71, 7.02]
+  - [5.64, 6.84]
+  - [7.25, 6.92]
+  - [-9.06, 8.56]
+  - [-7.35, 8.65]
+  - [-5.24, 8.48]
+  - [-2.96, 8.72]
+  - [-1.40, 8.64]
+  - [0.82, 8.83]
+  - [2.98, 8.47]
+  - [5.18, 8.37]
+  - [6.73, 8.75]
+
+# 電柱・標識柱(衝突あり、地図に反映)。開けた場所での自己位置推定(AMCL)の手がかりにもなる
+pole: {radius: 0.12, height: 2.4, color: [0.55, 0.52, 0.48]}
+poles:
+  - [-8.5, -4.5]
+  - [-1.5, -4.5]
+  - [1.9, -4.5]
+  - [5.8, -4.5]
+  - [3.9, -2.8]
+  - [3.9, 1.4]
+  - [-6.8, 0.5]
+  - [-1.0, 4.3]
+  - [2.2, 4.2]
+  - [7.8, -1.0]
+
+# 柵(河川との境界)
+fences:
+  - {name: river_fence, x1: 8.35, y1: -9.9, x2: 8.35, y2: 9.9, height: 0.6, thickness: 0.08, color: [0.55, 0.55, 0.55]}
+
+# その他の箱形の物体(衝突あり、地図に反映)
+boxes:
+  - {name: garbage_station, x: 7.2, y: 2.0, size_x: 1.4, size_y: 0.9, size_z: 1.0, yaw: 0.0, color: [0.20, 0.55, 0.25]}
+  - {name: rock_1, x: 0.8, y: 2.8, size_x: 0.8, size_y: 0.7, size_z: 0.5, yaw: 0.5, color: [0.45, 0.45, 0.42]}
+  - {name: fallen_log, x: -1.8, y: 0.8, size_x: 1.6, size_y: 0.35, size_z: 0.35, yaw: 0.4, color: [0.40, 0.28, 0.15]}
+  - {name: rock_2, x: 4.8, y: -3.3, size_x: 0.6, size_y: 0.6, size_z: 0.4, yaw: 0.2, color: [0.50, 0.48, 0.45]}
+  - {name: bench_1, x: -7.0, y: 1.8, size_x: 1.2, size_y: 0.45, size_z: 0.45, yaw: 0.0, color: [0.50, 0.35, 0.20]}
+  - {name: bench_2, x: 1.0, y: -2.8, size_x: 1.2, size_y: 0.45, size_z: 0.45, yaw: 0.3, color: [0.50, 0.35, 0.20]}
+
+# 動物(衝突あり。地図には載せない = ロボットにとって未知の物体)
+# bear の座標はレベル1の近接検知(bear_proximity_monitor)の既知座標としても使う。
+animals:
+  - {id: bear_1, species: bear, x: -4.0, y: 5.3, yaw: -1.2}   # P2 林縁
+  - {id: bear_2, species: bear, x: 5.8, y: 3.7, yaw: -2.0}    # P4 ごみ集積所
+  - {id: deer_1, species: deer, x: 7.4, y: -4.6, yaw: 2.6}    # P5 河川沿い(熊以外の動物)
+
+# 地図上の進入禁止領域(河川)
+keepout:
+  - {name: river, x_min: 8.3, x_max: 10.0, y_min: -10.0, y_max: 10.0}

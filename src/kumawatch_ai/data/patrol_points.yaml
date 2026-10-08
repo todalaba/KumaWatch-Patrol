@@ -1,0 +1,48 @@
+# 巡回候補地点(架空の地図・模擬データ). 座標は map 座標系 [m], yaw [rad].
+# importance_weight は社会的重要度 w_i(効用 U_i = w_i * p_i - lambda * d_i で使用)。
+base:
+  name: 詰所(スタート/安全地点)
+  x: 0.0
+  y: -8.5
+  yaw: 0.0
+points:
+  - id: P1
+    name: 住宅地
+    name_en: Residential area
+    category: residential
+    x: -5.5
+    y: -5.5
+    yaw: 3.1416
+    importance_weight: 1.1
+  - id: P2
+    name: 林縁
+    name_en: Forest edge
+    category: forest_edge
+    x: -4.0
+    y: 3.5
+    yaw: 1.5708
+    importance_weight: 1.0
+  - id: P3
+    name: 通学路
+    name_en: School route
+    category: school_route
+    x: 3.0
+    y: -1.0
+    yaw: 1.5708
+    importance_weight: 1.2
+  - id: P4
+    name: ごみ集積所
+    name_en: Garbage station
+    category: garbage
+    x: 5.5
+    y: 2.0
+    yaw: 1.5708
+    importance_weight: 1.0
+  - id: P5
+    name: 河川沿い
+    name_en: Riverside
+    category: river
+    x: 7.0
+    y: -3.0
+    yaw: 0.0
+    importance_weight: 1.0

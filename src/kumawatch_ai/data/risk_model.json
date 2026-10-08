@@ -1,0 +1,59 @@
+{
+  "name": "logistic_regression_v1",
+  "type": "logistic_regression",
+  "raw_features": [
+    "past_sightings_30d",
+    "sighted_yesterday",
+    "dist_to_forest_m",
+    "garbage_site",
+    "hour",
+    "temperature_c",
+    "precipitation_mm"
+  ],
+  "model_features": [
+    "past_sightings_30d",
+    "sighted_yesterday",
+    "forest_proximity",
+    "garbage_site",
+    "twilight",
+    "temperature_c",
+    "precipitation_mm"
+  ],
+  "forest_decay_m": 150.0,
+  "intercept": -1.780918758479611,
+  "coef": [
+    0.29283895569774043,
+    0.5323110778926283,
+    0.4871445497982484,
+    0.6202248531152865,
+    0.3069050676787955,
+    0.2822391355531291,
+    -0.4278823480272311
+  ],
+  "mean": [
+    1.5166666666666666,
+    0.182,
+    0.2496726286256998,
+    0.15716666666666668,
+    0.33516666666666667,
+    14.99994275272301,
+    1.536011221333233
+  ],
+  "std": [
+    1.238166206757199,
+    0.38584452827533133,
+    0.2568883861230132,
+    0.36395783485940086,
+    0.4720486968758832,
+    6.033818841513972,
+    3.118788603003475
+  ],
+  "metrics": {
+    "n_train": 6000,
+    "n_test": 2000,
+    "positive_rate_train": 0.195,
+    "test_auc": 0.7966,
+    "test_brier": 0.1181,
+    "seed": 2026
+  }
+}

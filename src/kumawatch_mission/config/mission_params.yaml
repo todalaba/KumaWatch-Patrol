@@ -1,0 +1,38 @@
+# KumaWatch Patrol のミッション設定(launch 引数で上書き可能)
+mission_planner:
+  ros__parameters:
+    use_sim_time: true
+    strategy: utility          # utility: U = w*p - λd の上位K / topk: リスク上位K / fixed: 固定ルート
+    budget_k: 3                # 巡回可能な地点数 K
+    lambda_distance: 0.02      # 移動コストの重み λ [1/m]
+    fixed_route: [P1, P2, P3]  # strategy=fixed のときの巡回順(比較用)
+    observe_duration: 3.0      # 地点到着後の確認時間 [s]
+    bear_stop_duration: 5.0    # 熊を検知したときの停止時間 [s]
+    on_bear: continue          # continue: 次の地点へ / retreat: 熊から離れた安全地点へ退避してから次へ / finish: 巡回を打ち切り詰所へ
+    retreat_distance: 3.0      # 退避で熊から下がる距離 [m]
+    goal_timeout: 240.0        # 1地点あたりの移動制限時間 [s]
+    return_to_base: true       # 巡回後に詰所へ戻る
+
+bear_proximity_monitor:
+  ros__parameters:
+    use_sim_time: true
+    detection_radius: 2.5      # この距離まで熊に近づいたら「熊の近くに到達」とみなす [m]
+    rate: 5.0
+    map_frame: map
+    robot_frame: base_footprint
+
+risk_predictor:
+  ros__parameters:
+    use_sim_time: true
+    mode: ttm                  # ttm: KumaWatch の TTM 予測 / simulated: 模擬データのモデル / model: その場で推定
+    frame_id: map
+
+bear_detector:
+  ros__parameters:
+    use_sim_time: true
+    conf_threshold: 0.5        # YOLO の確信度のしきい値
+    min_consecutive: 3         # 連続で検出されたフレーム数で「熊」と確定
+    report_distance: 4.0       # この距離以内の熊で停止させる(安全な距離) [m]
+    imgsz: 416
+    image_topic: /camera/image_raw
+    camera_info_topic: /camera/camera_info

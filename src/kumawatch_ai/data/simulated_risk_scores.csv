@@ -1,0 +1,6 @@
+point_id,risk,model
+P1,0.187,logistic_regression_v1
+P2,0.847,logistic_regression_v1
+P3,0.737,logistic_regression_v1
+P4,0.905,logistic_regression_v1
+P5,0.427,logistic_regression_v1

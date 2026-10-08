@@ -1,0 +1,6 @@
+point_id,past_sightings_30d,sighted_yesterday,dist_to_forest_m,garbage_site,hour,temperature_c,precipitation_mm
+P1,2,0,180,0,17,16.0,0.5
+P2,4,1,0,0,17,16.0,0.5
+P3,3,1,40,0,17,16.0,0.5
+P4,3,1,100,1,17,16.0,0.5
+P5,4,0,60,0,17,16.0,0.5

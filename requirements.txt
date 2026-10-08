@@ -1,0 +1,12 @@
+# Python packages for KumaWatch Patrol.
+# ROS 2 Humble, Gazebo Classic 11, Navigation2 and TurtleBot3 are installed with apt (see README, "Quick start").
+# Install with:  pip3 install --user -r requirements.txt
+# Versions verified in the lecture Docker image (Ubuntu 22.04, Python 3.10):
+#   ultralytics 8.3.74, torch 2.6.0, numpy 1.26.4, opencv-contrib-python 4.5.5.64
+
+ultralytics==8.3.74   # YOLOv8 bear detection (bear_detector); also installs torch and opencv-python
+numpy<2               # ROS 2 Humble and Ubuntu 22.04's matplotlib are built against NumPy 1.x
+PyYAML>=5.4           # site and world definitions
+Pillow>=9.0           # figures and video tools (scripts/video)
+matplotlib>=3.5       # figure scripts only
+pytest>=7             # unit tests (python3 -m pytest src)
