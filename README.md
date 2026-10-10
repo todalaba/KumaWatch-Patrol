@@ -253,8 +253,8 @@ KumaWatch (a private research repository). No photographs of real bears and no p
 ## 7. Results in Gazebo and comparison with a fixed route
 
 **Run in the lecture environment** (Docker, Happy Mini, no GPU; Gazebo + Navigation2 + YOLOv8 all running; shown in the video):
-the robot went to P2 and YOLOv8 detected a bear (confidence 0.74, 3.4 m); it stopped, recorded it and tried to retreat.
-On the way to P4 it detected the second bear (0.81, 3.2 m), stopped, recorded it and retreated to a safe spot. It then checked P3
+the robot went to P2 and YOLOv8 detected a bear (confidence 0.75, 4.0 m); it stopped, recorded it and tried to retreat.
+On the way to P4 it detected the second bear (0.82, 3.9 m), stopped, recorded it and retreated to a safe spot. It then checked P3
 (no bear) and returned to the base: 3 of 3 sites checked, 2 bears, 31.4 m, 173 s (simulation time).
 
 ![Route comparison](media/route_comparison.png)
@@ -264,7 +264,7 @@ On the way to P4 it detected the second bear (0.81, 3.2 m), stopped, recorded it
 | Summed AI risk of the patrolled sites | 2.33 | **2.97** |
 | Sites checked | 3 / 3 | 3 / 3 |
 | Bears found | 2 (1 near P4, seen by chance from P3) | 2 (while checking P2 and P4) |
-| YOLOv8 confidence at detection | 0.73, 0.86 | 0.74, 0.81 |
+| YOLOv8 confidence at detection | 0.73, 0.86 | 0.75, 0.82 |
 | Retreat to a safe spot | succeeded both times | P4 succeeded; P2 failed (no path) |
 | Distance travelled (log) | 33.6 m | 31.4 m |
 | Time taken (simulation time) | 166.6 s | 173.3 s |
