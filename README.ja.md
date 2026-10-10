@@ -10,11 +10,11 @@
 ロボットはカメラ画像をもう一つの AI（**YOLOv8**）で判定し、熊を見つけると安全な距離で停止して記録し、
 熊から離れた安全地点へ退避してから巡回を続けます。
 
-[![KumaWatch Patrol（YouTube）](media/demo.jpg)](https://www.youtube.com/watch?v=k5Kr4eU_tf8)
+[![KumaWatch Patrol（YouTube）](media/demo.jpg)](https://www.youtube.com/watch?v=t66S8h_LumE)
 
 | | |
 |---|---|
-| 動画（2 分 37 秒） | **<https://www.youtube.com/watch?v=k5Kr4eU_tf8>**（[リポジトリ内の MP4](docs/videos/KumaWatch_Patrol_final.mp4)） |
+| 動画（2 分 37 秒） | **<https://www.youtube.com/watch?v=t66S8h_LumE>**（[リポジトリ内の MP4](docs/videos/KumaWatch_Patrol_final.mp4)） |
 | レポート（A4。日本語 6 ページ・英語 5 ページ） | [日本語 PDF](docs/report/KumaWatch_Patrol_final_report.pdf) / [英語 PDF](docs/report/KumaWatch_Patrol_final_report_en.pdf)（Word も同じフォルダ） |
 | ソフトウェア | Ubuntu 22.04、ROS 2 Humble、Gazebo Classic 11、Navigation2、Python 3.10、Ultralytics YOLOv8（[詳細](#4-ソフトウェアとバージョン)） |
 | AI | TTM（時系列予測の基盤モデル）によるリスク予測と、追加学習した YOLOv8n によるカメラ画像の熊判定 |

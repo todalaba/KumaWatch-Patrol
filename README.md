@@ -9,11 +9,11 @@ from the bear-sighting forecast AI (**TTM**) of the research project KumaWatch (
 It checks its camera images with a second AI (**YOLOv8**); when it finds a bear it stops at a safe distance, records the encounter,
 retreats to a safe spot away from the bear, and then continues the patrol.
 
-[![KumaWatch Patrol (YouTube)](media/demo.jpg)](https://www.youtube.com/watch?v=k5Kr4eU_tf8)
+[![KumaWatch Patrol (YouTube)](media/demo.jpg)](https://www.youtube.com/watch?v=t66S8h_LumE)
 
 | | |
 |---|---|
-| Video (2 min 37 s) | **<https://www.youtube.com/watch?v=k5Kr4eU_tf8>** ([MP4 in this repository](docs/videos/KumaWatch_Patrol_final.mp4)) |
+| Video (2 min 37 s) | **<https://www.youtube.com/watch?v=t66S8h_LumE>** ([MP4 in this repository](docs/videos/KumaWatch_Patrol_final.mp4)) |
 | Report (A4; Japanese 6 pages, English 5 pages) | [English PDF](docs/report/KumaWatch_Patrol_final_report_en.pdf) / [Japanese PDF](docs/report/KumaWatch_Patrol_final_report.pdf) (Word files in the same folder) |
 | Software | Ubuntu 22.04, ROS 2 Humble, Gazebo Classic 11, Navigation2, Python 3.10, Ultralytics YOLOv8 ([details](#4-software-and-versions)) |
 | AI | TTM (time-series foundation model) for risk forecasting; YOLOv8n fine-tuned for bear detection in camera images |
