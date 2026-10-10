@@ -66,13 +66,13 @@ NVIDIA GPU があるホストでは、`docker run` に `--gpus all` を付ける
 
 ```bash
 cd ~/airobot_ws/src
-git clone https://github.com/Global-jogasaki/kumawatch-patrol.git KumaRobot
+git clone https://github.com/todalaba/KumaWatch-Patrol.git KumaRobot
 ```
 
 ホスト PC でクローンしてコンテナにコピーする場合は、ホスト PC の端末で次を実行します。
 
 ```bash
-git clone https://github.com/Global-jogasaki/kumawatch-patrol.git KumaRobot
+git clone https://github.com/todalaba/KumaWatch-Patrol.git KumaRobot
 docker cp KumaRobot kumawatch:/home/ubuntu/airobot_ws/src/
 docker exec -u root kumawatch chown -R ubuntu:ubuntu /home/ubuntu/airobot_ws/src/KumaRobot
 ```

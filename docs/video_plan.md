@@ -136,8 +136,6 @@ RViz が録画に入っていないときは、(4) の `--rviz-crop` の代わ�
 見た目だけのロボットが記録どおりに動き、前向きカメラ・TF・ミッションの状況も配信するので、
 追従カメラの角度（`-p mode:=chase / far / top`）を変えて何度でも撮れます。
 Nav2 がその場で走っているわけではないので、動画に使う場合は「走行記録の再生」と明記してください。
-このリポジトリでの試し撮り: [docs/videos/KumaWatch_Patrol_preview_new_views.mp4](videos/KumaWatch_Patrol_preview_new_views.mp4)
-（Nav2 の走行記録を再生し、追従カメラ・HUD・YOLOv8 の検出・退避を撮ったもの。ロボットは見た目だけのモデル）。
 
 ```bash
 # Gazebo(ワールドのみ)を起動した状態で
