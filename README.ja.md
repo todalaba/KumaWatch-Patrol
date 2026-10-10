@@ -15,7 +15,7 @@
 | | |
 |---|---|
 | 動画（2 分 42 秒） | **<https://www.youtube.com/watch?v=k5Kr4eU_tf8>**（[リポジトリ内の MP4](docs/videos/KumaWatch_Patrol_final.mp4)） |
-| レポート（A4・5 ページ） | [日本語 PDF](docs/report/KumaWatch_Patrol_final_report.pdf) / [英語 PDF](docs/report/KumaWatch_Patrol_final_report_en.pdf)（Word も同じフォルダ） |
+| レポート（A4。日本語 6 ページ・英語 5 ページ） | [日本語 PDF](docs/report/KumaWatch_Patrol_final_report.pdf) / [英語 PDF](docs/report/KumaWatch_Patrol_final_report_en.pdf)（Word も同じフォルダ） |
 | ソフトウェア | Ubuntu 22.04、ROS 2 Humble、Gazebo Classic 11、Navigation2、Python 3.10、Ultralytics YOLOv8（[詳細](#4-ソフトウェアとバージョン)） |
 | AI | TTM（時系列予測の基盤モデル）によるリスク予測と、追加学習した YOLOv8n によるカメラ画像の熊判定 |
 | データ | リスク：5 地点分の**事前計算済み** TTM スコア（山形県の公開出没データから計算。データそのものは含まない）。町・地点・熊：**架空・模擬**。学習画像：Gazebo で作った**合成画像** |
