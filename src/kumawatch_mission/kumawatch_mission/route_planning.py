@@ -150,3 +150,32 @@ def retreat_point(robot, bear, distance_m=3.0, bounds=(-9.0, 9.0, -9.0, 9.0)):
     y = min(max(y, ymin), ymax)
     yaw = math.atan2(bear[1] - y, bear[0] - x)
     return x, y, yaw
+
+
+def retreat_candidates(robot, bear, distance_m=3.0, bounds=(-9.0, 9.0, -9.0, 9.0),
+                       angles_deg=(0.0, 45.0, -45.0, 90.0, -90.0), min_gain_m=0.5):
+    """退避地点の候補 [(x, y, yaw), ...] を優先順に返す.
+
+    1 番目は retreat_point と同じ「熊の真反対」。そこへの経路が作れない場合に備えて、
+    向きを angles_deg だけ回した地点を順に候補にする。熊からの距離が今より
+    min_gain_m 以上離れない候補(熊に近づく・横に動くだけの候補)は除く。
+    ワールドの範囲に切り詰めた結果、重複した候補も除く。
+    """
+    dx, dy = robot[0] - bear[0], robot[1] - bear[1]
+    norm = math.hypot(dx, dy)
+    if norm < 1e-6:
+        dx, dy, norm = 0.0, -1.0, 1.0
+    base = math.atan2(dy, dx)
+    xmin, xmax, ymin, ymax = bounds
+    now = math.hypot(robot[0] - bear[0], robot[1] - bear[1])
+    out = []
+    for a in angles_deg:
+        th = base + math.radians(a)
+        x = min(max(robot[0] + math.cos(th) * distance_m, xmin), xmax)
+        y = min(max(robot[1] + math.sin(th) * distance_m, ymin), ymax)
+        if math.hypot(x - bear[0], y - bear[1]) < now + min_gain_m:
+            continue
+        if any(math.hypot(x - c[0], y - c[1]) < 0.3 for c in out):
+            continue
+        out.append((x, y, math.atan2(bear[1] - y, bear[0] - x)))
+    return out

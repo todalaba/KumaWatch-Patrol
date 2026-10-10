@@ -40,6 +40,11 @@ class FakeNav2(Node):
         self.declare_parameter('speed', 0.26)        # [m/s]
         self.declare_parameter('time_scale', 1.0)    # >1 で早送り
         self.declare_parameter('rate', 20.0)
+        # 試験用: 受け取った順で何番目のゴールを「経路なし」で失敗させるか(例 "2,3,4,5,6")
+        self.declare_parameter('abort_goals', '')
+        self.abort_goals = {int(v) for v in str(self.get_parameter('abort_goals').value).split(',')
+                            if v.strip()}
+        self.goal_count = 0
 
         self.x = float(self.get_parameter('start_x').value)
         self.y = float(self.get_parameter('start_y').value)
@@ -97,8 +102,13 @@ class FakeNav2(Node):
         scale = float(self.get_parameter('time_scale').value)
         dt = 1.0 / float(self.get_parameter('rate').value)
         self.active_goal = handle
-        self.get_logger().info('goal (%.2f, %.2f)' % (tx, ty))
+        self.goal_count += 1
+        self.get_logger().info('goal #%d (%.2f, %.2f)' % (self.goal_count, tx, ty))
         result = NavigateToPose.Result()
+        if self.goal_count in self.abort_goals:   # 経路が作れなかった場合の模擬
+            self.get_logger().warn('goal #%d aborted (simulated: no path)' % self.goal_count)
+            handle.abort()
+            return result
         while rclpy.ok():
             if handle.is_cancel_requested:
                 with self.lock:

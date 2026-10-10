@@ -46,7 +46,8 @@ from kumawatch_mission.chase_math import camera_sdf, quaternion  # noqa: E402
 STATE_OF = {'mission_started': 'PATROL', 'navigate': 'PATROL', 'arrived': 'OBSERVE',
             'clear': 'OBSERVE', 'bear_detected': 'EMERGENCY_STOP', 'retreat': 'RETREAT',
             'retreat_done': 'PATROL', 'retreat_failed': 'PATROL', 'return_to_base': 'RETURN_TO_BASE',
-            'returned': 'RETURN_TO_BASE', 'mission_completed': 'FINISHED'}
+            'returned': 'RETURN_TO_BASE', 'mission_completed': 'FINISHED',
+            'safe_hold': 'SAFE_HOLD'}
 
 
 def load(run):

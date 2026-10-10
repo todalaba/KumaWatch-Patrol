@@ -8,8 +8,12 @@ mission_planner:
     fixed_route: [P1, P2, P3]  # strategy=fixed のときの巡回順(比較用)
     observe_duration: 3.0      # 地点到着後の確認時間 [s]
     bear_stop_duration: 5.0    # 熊を検知したときの停止時間 [s]
-    on_bear: continue          # continue: 次の地点へ / retreat: 熊から離れた安全地点へ退避してから次へ / finish: 巡回を打ち切り詰所へ
+    on_bear: retreat           # retreat: 熊から離れた安全地点へ退避してから次へ / continue: 次の地点へ / finish: 巡回を打ち切り詰所へ
     retreat_distance: 3.0      # 退避で熊から下がる距離 [m]
+    retreat_angles_deg: [0.0, 45.0, -45.0, 90.0, -90.0]  # 退避地点へ行けないときに試す向き(0 = 熊の真反対)
+    retreat_timeout: 60.0      # 退避 1 候補あたりの制限時間 [s]
+    on_retreat_fail: hold      # hold: 安全停止して管理者の指示を待つ(SAFE_HOLD) / continue: 巡回を続ける(以前の試作)
+    safe_hold_timeout: 0.0     # SAFE_HOLD の待ち時間 [s]。0 なら指示があるまで待つ
     goal_timeout: 240.0        # 1地点あたりの移動制限時間 [s]
     return_to_base: true       # 巡回後に詰所へ戻る
 

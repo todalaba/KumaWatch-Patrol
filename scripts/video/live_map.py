@@ -36,6 +36,7 @@ PATH = (60, 190, 255)
 STATE_TEXT = {'navigate': 'Navigating', 'arrived': 'Arrived - observing', 'clear': 'Clear',
               'bear_detected': 'BEAR DETECTED - stopped', 'retreat': 'Retreating to safe point',
               'retreat_done': 'Safe point reached', 'retreat_failed': 'Safe point unreachable',
+              'safe_hold': 'SAFE HOLD - waiting for operator',
               'unreachable': 'Point unreachable', 'timeout': 'Timeout',
               'return_to_base': 'Returning to base', 'returned': 'Back at base',
               'mission_completed': 'Mission completed', 'mission_started': 'Mission started'}

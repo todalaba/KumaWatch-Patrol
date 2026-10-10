@@ -1,3 +1,4 @@
+import math
 import itertools
 import os
 import sys
@@ -9,7 +10,7 @@ sys.path.insert(0, PKG)
 
 from kumawatch_mission.route_planning import (  # noqa: E402
     distance, format_candidate_table, nearest_within, order_route, plan_patrol,
-    route_length, select_points)
+    retreat_candidates, retreat_point, route_length, select_points)
 
 START = (0.0, -8.5)
 # 論文用シナリオと同じ値(src/kumawatch_ai/data を参照)
@@ -100,3 +101,40 @@ def test_table_marks_selected():
     line = [ln for ln in table.splitlines() if ln.strip().startswith('P4')][0]
     assert line.rstrip().endswith('*')
     assert distance((0, 0), (3, 4)) == 5
+
+
+# ---------------------------------------------------------------- 退避地点の候補
+def test_retreat_candidates_first_is_straight_away():
+    robot, bear = (0.0, 0.0), (0.0, 4.0)
+    cands = retreat_candidates(robot, bear, 3.0)
+    assert cands[0][:2] == pytest.approx(retreat_point(robot, bear, 3.0)[:2])
+    assert cands[0][:2] == pytest.approx((0.0, -3.0))
+
+
+def test_retreat_candidates_all_move_away_from_bear():
+    robot, bear = (1.0, 1.0), (3.0, 2.5)
+    now = distance(robot, bear)
+    cands = retreat_candidates(robot, bear, 3.0)
+    assert len(cands) == 5            # 0, ±45, ±90 度
+    for x, y, yaw in cands:
+        assert distance((x, y), bear) >= now + 0.5
+        # 退避後は熊の方を向く
+        assert yaw == pytest.approx(math.atan2(bear[1] - y, bear[0] - x))
+
+
+def test_retreat_candidates_drop_points_that_do_not_gain_distance():
+    # 熊が遠いと ±90 度は横に動くだけで、ほとんど離れられない
+    robot, bear = (0.0, 0.0), (0.0, 20.0)
+    cands = retreat_candidates(robot, bear, 3.0, bounds=(-50, 50, -50, 50))
+    assert len(cands) == 3
+
+
+def test_retreat_candidates_clamped_to_world_without_duplicates():
+    # 壁際: 真後ろも斜め後ろも範囲外 → 切り詰めた結果の重複を除く
+    robot, bear = (0.0, -8.8), (0.0, -6.0)
+    cands = retreat_candidates(robot, bear, 3.0)
+    pts = [c[:2] for c in cands]
+    for i, a in enumerate(pts):
+        assert -9.0 <= a[1] <= 9.0
+        for b in pts[i + 1:]:
+            assert distance(a, b) >= 0.3

@@ -4,10 +4,15 @@
   RISK_ASSESSMENT → ROUTE_PLANNING → WAIT_NAV2 → PATROL ⇄ OBSERVE → ... → (RETURN) → FINISHED
                                                   PATROL/OBSERVE → EMERGENCY_STOP(熊検知) → REPORT → PATROL
                                                   (on_bear=retreat: EMERGENCY_STOP → RETREAT → PATROL)
+  退避地点へ行けない場合は向きを変えた代替の退避地点を順に試し、すべて失敗したら
+  SAFE_HOLD(その場で安全停止し、管理者へ通知して判断を待つ)に入る。
+  SAFE_HOLD は /kumawatch/operator_command(resume / return / finish)で抜ける。
+  (on_retreat_fail=continue にすると、以前の試作と同じく巡回を続ける)
 
 入力:
   /kumawatch/risk_scores     kumawatch_interfaces/RiskScoreArray
   /kumawatch/bear_detection  kumawatch_interfaces/BearDetection
+  /kumawatch/operator_command std_msgs/String(SAFE_HOLD 中の管理者の指示: resume / return / finish)
   /odom                      nav_msgs/Odometry(移動距離の積算)
   /amcl_pose                 geometry_msgs/PoseWithCovarianceStamped(自己位置推定の準備確認)
   navigate_to_pose           nav2_msgs/action/NavigateToPose(アクションクライアント)
@@ -18,6 +23,7 @@
   /kumawatch/mission_events  std_msgs/String(出来事 1 件ごとの JSON。mission_console・動画編集で使う)
   <output_dir>/<日時>_<strategy>/mission_events.csv(出来事の時刻表。壁時計とシミュレーション時刻)
   /kumawatch/patrol_markers  visualization_msgs/MarkerArray(巡回順・結果・熊の位置)
+  /kumawatch/operator_alert  std_msgs/String(管理者への通知 JSON。SAFE_HOLD に入ったとき)
   /cmd_vel                   geometry_msgs/Twist(緊急停止時のゼロ速度)
 """
 
@@ -44,7 +50,7 @@ from std_msgs.msg import String
 from visualization_msgs.msg import Marker, MarkerArray
 import yaml
 
-from kumawatch_mission.route_planning import format_candidate_table, plan_patrol, retreat_point
+from kumawatch_mission.route_planning import format_candidate_table, plan_patrol, retreat_candidates
 
 RISK_ASSESSMENT = 'RISK_ASSESSMENT'
 ROUTE_PLANNING = 'ROUTE_PLANNING'
@@ -53,6 +59,7 @@ PATROL = 'PATROL'
 OBSERVE = 'OBSERVE'
 EMERGENCY_STOP = 'EMERGENCY_STOP'
 RETREAT = 'RETREAT'
+SAFE_HOLD = 'SAFE_HOLD'
 RETURN = 'RETURN_TO_BASE'
 FINISHED = 'FINISHED'
 
@@ -93,8 +100,13 @@ class MissionPlanner(Node):
         self.declare_parameter('fixed_route', ['P1', 'P2', 'P3'])
         self.declare_parameter('observe_duration', 3.0)        # 到着後の確認時間 [s]
         self.declare_parameter('bear_stop_duration', 5.0)      # 熊検知時の停止時間 [s]
-        self.declare_parameter('on_bear', 'continue')          # continue / retreat / finish
+        self.declare_parameter('on_bear', 'retreat')           # retreat / continue / finish
         self.declare_parameter('retreat_distance', 3.0)        # 退避で熊から下がる距離 [m]
+        # 退避地点への経路が作れないときに試す向き [deg](0 = 熊の真反対)
+        self.declare_parameter('retreat_angles_deg', [0.0, 45.0, -45.0, 90.0, -90.0])
+        self.declare_parameter('retreat_timeout', 60.0)        # 退避 1 候補あたりの制限時間 [s]
+        self.declare_parameter('on_retreat_fail', 'hold')      # hold(安全停止して待つ) / continue
+        self.declare_parameter('safe_hold_timeout', 0.0)       # SAFE_HOLD の待ち時間 [s](0 = 指示があるまで)
         self.declare_parameter('goal_timeout', 240.0)          # 1地点あたりの制限時間 [s]
         self.declare_parameter('return_to_base', True)
         self.declare_parameter('output_dir', os.path.expanduser('~/kumawatch_patrol_output'))
@@ -133,6 +145,8 @@ class MissionPlanner(Node):
         self.last_wait_log = None
         self.last_bear = None      # HUD 用の直近の熊検知
         self.retreat_goal = None
+        self.retreat_queue = []    # まだ試していない退避地点の候補
+        self.retreat_tried = []    # 試して到達できなかった退避地点
         self.run_dir = os.path.join(self.get_parameter('output_dir').value, '%s_%s' % (
             datetime.now().strftime('%Y%m%d_%H%M%S'), self.strategy))
         self.timeline_path = None
@@ -144,6 +158,7 @@ class MissionPlanner(Node):
         self.status_pub = self.create_publisher(String, '/kumawatch/mission_status', latched_qos())
         self.event_pub = self.create_publisher(String, '/kumawatch/mission_events',
                                                QoSProfile(depth=50))
+        self.alert_pub = self.create_publisher(String, '/kumawatch/operator_alert', latched_qos())
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         self.initpose_pub = self.create_publisher(PoseWithCovarianceStamped, '/initialpose', 10)
 
@@ -151,6 +166,7 @@ class MissionPlanner(Node):
                                  latched_qos())
         self.create_subscription(BearDetection, '/kumawatch/bear_detection', self._on_bear, 10)
         self.create_subscription(Odometry, '/odom', self._on_odom, 20)
+        self.create_subscription(String, '/kumawatch/operator_command', self._on_operator, 10)
         self.create_subscription(PoseWithCovarianceStamped, '/amcl_pose', self._on_amcl,
                                  latched_qos())
 
@@ -299,6 +315,20 @@ class MissionPlanner(Node):
                 msg.bear_id, event['point_id'] or '-', msg.distance, msg.confidence))
         self._publish_markers()
 
+    def _on_operator(self, msg):
+        """SAFE_HOLD 中の管理者の指示: resume(巡回を続ける) / return(詰所へ戻る) / finish(終了)."""
+        cmd = msg.data.strip().lower()
+        if self.state != SAFE_HOLD:
+            self.get_logger().info('管理者の指示 "%s" を受信しましたが、SAFE_HOLD 中ではないので無視します' % cmd)
+            return
+        if cmd not in ('resume', 'return', 'finish'):
+            self.get_logger().warn('不明な指示 "%s"(resume / return / finish のいずれか)' % cmd)
+            return
+        self.get_logger().warn('管理者の指示 "%s" により SAFE_HOLD を解除します' % cmd)
+        self._event('operator_command', self.last_bear['point_id'] if self.last_bear else '',
+                    {'command': cmd})
+        self._leave_safe_hold(cmd)
+
     def _bear_action(self):
         return {'retreat': 'Stop, report and retreat', 'finish': 'Stop, report and return',
                 }.get(self.get_parameter('on_bear').value, 'Stop and report')
@@ -352,12 +382,14 @@ class MissionPlanner(Node):
                 self._event('unreachable', cur['point_id'])
                 self._next_target()
         elif self.state == RETREAT:
-            ok = status == GoalStatus.STATUS_SUCCEEDED
-            self.get_logger().info('安全地点への退避を完了しました' if ok
-                                   else '退避地点に到達できませんでした (status=%d)。巡回を続けます' % status)
-            self._event('retreat_done' if ok else 'retreat_failed',
-                        self.last_bear['point_id'] if self.last_bear else '')
-            self._after_bear()
+            if status == GoalStatus.STATUS_SUCCEEDED:
+                self.get_logger().info('安全地点への退避を完了しました')
+                self._event('retreat_done', self.last_bear['point_id'] if self.last_bear else '',
+                            {'x': round(self.retreat_goal[0], 2), 'y': round(self.retreat_goal[1], 2),
+                             'attempt': len(self.retreat_tried) + 1})
+                self._after_bear()
+            else:
+                self._retreat_failed('status=%d' % status)
         elif self.state == RETURN:
             self.get_logger().info('詰所に帰還しました' if status == GoalStatus.STATUS_SUCCEEDED
                                    else '詰所への帰還に失敗しました (status=%d)' % status)
@@ -452,22 +484,99 @@ class MissionPlanner(Node):
                 else:
                     self._after_bear()
         elif self.state == RETREAT:
-            timeout = self.get_parameter('goal_timeout').value
+            timeout = self.get_parameter('retreat_timeout').value
             if self.goal_sent_at is not None and self._now_s() - self.goal_sent_at > timeout:
-                self.get_logger().error('退避がタイムアウトしました。巡回を続けます')
                 self._cancel_goal()
-                self._after_bear()
+                self._retreat_failed('timeout')
+        elif self.state == SAFE_HOLD:
+            self._publish_stop()   # 指示があるまで動かない
+            limit = float(self.get_parameter('safe_hold_timeout').value)
+            if limit > 0.0 and self._elapsed() >= limit:
+                self.get_logger().warn('SAFE_HOLD の待ち時間 %.0f s を過ぎたので詰所へ戻ります' % limit)
+                self._event('safe_hold_timeout', self.last_bear['point_id'] if self.last_bear else '')
+                self._leave_safe_hold('return')
 
     def _start_retreat(self):
         b = self.last_bear
-        x, y, yaw = retreat_point((b['robot_x'], b['robot_y']), (b['bear_x'], b['bear_y']),
-                                  float(self.get_parameter('retreat_distance').value))
-        self.retreat_goal = (x, y)
-        self.get_logger().warn('熊から離れて安全地点 (%.1f, %.1f) へ退避します' % (x, y))
+        self.retreat_queue = retreat_candidates(
+            (b['robot_x'], b['robot_y']), (b['bear_x'], b['bear_y']),
+            float(self.get_parameter('retreat_distance').value),
+            angles_deg=[float(a) for a in self.get_parameter('retreat_angles_deg').value])
+        self.retreat_tried = []
         self._set_state(RETREAT)
-        self._event('retreat', b['point_id'], {'x': round(x, 2), 'y': round(y, 2)})
+        self._try_next_retreat()
+
+    def _try_next_retreat(self):
+        """退避地点の候補を 1 つ取り出して Nav2 に送る。候補がなければ失敗として扱う."""
+        b = self.last_bear
+        if not self.retreat_queue:
+            self._retreat_exhausted()
+            return
+        x, y, yaw = self.retreat_queue.pop(0)
+        self.retreat_goal = (x, y)
+        attempt = len(self.retreat_tried) + 1
+        if attempt == 1:
+            self.get_logger().warn('熊から離れて安全地点 (%.1f, %.1f) へ退避します' % (x, y))
+        else:
+            self.get_logger().warn('代替の安全地点 (%.1f, %.1f) へ退避します(%d 番目の候補)' % (
+                x, y, attempt))
+        self._event('retreat', b['point_id'], {'x': round(x, 2), 'y': round(y, 2),
+                                                'attempt': attempt})
         self._send_goal(x, y, yaw)
         self._publish_markers()
+
+    def _retreat_failed(self, reason):
+        """1 つの退避地点に行けなかった。次の候補を試す."""
+        x, y = self.retreat_goal if self.retreat_goal else (float('nan'), float('nan'))
+        self.retreat_tried.append({'x': round(x, 2), 'y': round(y, 2), 'reason': reason})
+        self.get_logger().error('退避地点 (%.1f, %.1f) に到達できませんでした (%s)' % (x, y, reason))
+        self._event('retreat_failed', self.last_bear['point_id'] if self.last_bear else '',
+                    {'x': round(x, 2), 'y': round(y, 2), 'reason': reason,
+                     'remaining': len(self.retreat_queue)})
+        self._try_next_retreat()
+
+    def _retreat_exhausted(self):
+        """退避地点の候補をすべて試しても退避できなかった."""
+        self.retreat_goal = None
+        b = self.last_bear or {}
+        if self.get_parameter('on_retreat_fail').value == 'continue':
+            # 以前の試作と同じ動作(安全設計としては弱いので既定ではない)
+            self.get_logger().error('退避できませんでした。on_retreat_fail=continue のため巡回を続けます')
+            self._after_bear()
+            return
+        self._cancel_goal()
+        self._publish_stop()
+        self._set_state(SAFE_HOLD)
+        alert = {
+            'type': 'safe_hold',
+            'reason': 'no reachable safe point',
+            'time': datetime.now().isoformat(timespec='seconds'),
+            'ros_time_s': round(self._now_s(), 2),
+            'point_id': b.get('point_id', ''),
+            'bear_id': b.get('bear_id', ''),
+            'bear_x': b.get('bear_x'), 'bear_y': b.get('bear_y'),
+            'robot_x': b.get('robot_x'), 'robot_y': b.get('robot_y'),
+            'tried': self.retreat_tried,
+            'commands': ['resume', 'return', 'finish'],
+        }
+        self.alert_pub.publish(String(data=json.dumps(alert, ensure_ascii=False)))
+        self._event('safe_hold', alert['point_id'], alert)
+        self.get_logger().error(
+            '!!! 退避できる安全地点がありません。その場で停止し、管理者の判断を待ちます (SAFE_HOLD)\n'
+            '    指示: ros2 topic pub --once /kumawatch/operator_command std_msgs/String '
+            '"{data: resume}"   (resume / return / finish)')
+        self._publish_markers()
+
+    def _leave_safe_hold(self, cmd):
+        if cmd == 'resume':
+            self._after_bear()
+        elif cmd == 'return':
+            self.retreat_goal = None
+            self.target_idx = len(self.results)   # 残りの地点は巡回せず詰所へ
+            self._next_target()
+        else:
+            self.retreat_goal = None
+            self._finish()
 
     def _after_bear(self):
         """熊への対応(停止・記録・退避)を終えて、巡回を続けるか打ち切る."""

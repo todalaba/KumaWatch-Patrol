@@ -3,6 +3,9 @@
   ros2 launch kumawatch_mission dry_run.launch.py                    # AI 巡回
   ros2 launch kumawatch_mission dry_run.launch.py strategy:=fixed    # 固定ルート
   ros2 launch kumawatch_mission dry_run.launch.py time_scale:=5.0    # 5倍速
+  # 退避地点へ行けない場合(2〜6 番目のゴールを失敗させる → SAFE_HOLD で停止して指示待ち)
+  ros2 launch kumawatch_mission dry_run.launch.py on_bear:=retreat abort_goals:=2,3,4,5,6
+  ros2 topic pub --once /kumawatch/operator_command std_msgs/String "{data: return}"
 """
 
 import os
@@ -33,12 +36,15 @@ def generate_launch_description():
         DeclareLaunchArgument('risk_mode', default_value='ttm'),
         DeclareLaunchArgument('on_bear', default_value='continue'),
         DeclareLaunchArgument('time_scale', default_value='1.0', description='早送り倍率'),
+        DeclareLaunchArgument('abort_goals', default_value='',
+                              description='試験用: 失敗させるゴールの番号(例 "2,3,4,5,6")'),
 
         Node(package='kumawatch_mission', executable='fake_nav2', name='fake_nav2',
              output='screen', parameters=[{
                  'start_x': float(base['x']), 'start_y': float(base['y']),
                  'start_yaw': float(base.get('yaw', 0.0)),
                  'time_scale': ParameterValue(lc('time_scale'), value_type=float),
+                 'abort_goals': ParameterValue(lc('abort_goals'), value_type=str),
              }]),
         IncludeLaunchDescription(PythonLaunchDescriptionSource(nodes), launch_arguments={
             'use_sim_time': 'false',

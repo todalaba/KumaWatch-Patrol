@@ -18,7 +18,7 @@ from kumawatch_mission.mission_text import format_event
 
 GREEN, YELLOW, RED, BOLD, RESET = '\033[92m', '\033[93m', '\033[91m', '\033[1m', '\033[0m'
 WARN_EVENTS = {'bear_detected', 'retreat'}
-FAIL_EVENTS = {'unreachable', 'timeout', 'retreat_failed', 'return_failed'}
+FAIL_EVENTS = {'unreachable', 'timeout', 'retreat_failed', 'return_failed', 'safe_hold'}
 
 
 class MissionConsole(Node):

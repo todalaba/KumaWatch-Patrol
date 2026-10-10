@@ -75,6 +75,40 @@ jobs:
           assert os.path.exists(os.path.join(runs[-1], 'trajectory.csv'))
           PY
 
+      - name: Dry run - no reachable safe point, SAFE_HOLD until the operator resumes
+        env:
+          ROS_LOCALHOST_ONLY: "1"
+        run: |
+          source install/setup.bash
+          # goals 2-6 (the retreat candidates after the first bear) fail as if Nav2 found no path
+          timeout 150 ros2 launch kumawatch_mission dry_run.launch.py time_scale:=8.0 on_bear:=retreat \
+            abort_goals:=2,3,4,5,6 > dry_run_safe_hold.log 2>&1 &
+          LAUNCH_PID=$!
+          for i in $(seq 1 90); do grep -q "SAFE_HOLD" dry_run_safe_hold.log && break; sleep 1; done
+          grep -q "SAFE_HOLD" dry_run_safe_hold.log || (cat dry_run_safe_hold.log; exit 1)
+          sleep 3   # stays stopped while waiting
+          ros2 topic pub --once /kumawatch/operator_command std_msgs/String "{data: resume}"
+          for i in $(seq 1 90); do grep -q "巡回結果" dry_run_safe_hold.log && break; sleep 1; done
+          kill -INT $LAUNCH_PID 2>/dev/null || true
+          wait $LAUNCH_PID 2>/dev/null || true
+          grep -A12 "巡回結果" dry_run_safe_hold.log || (cat dry_run_safe_hold.log; exit 1)
+          python3 - <<'PY'
+          import csv, glob, os
+          runs = sorted(glob.glob('/root/kumawatch_patrol_output/*_utility') +
+                        glob.glob('/github/home/kumawatch_patrol_output/*_utility'), key=os.path.getmtime)
+          rows = list(csv.DictReader(open(os.path.join(runs[-1], 'mission_events.csv'), encoding='utf-8')))
+          kinds = [r['event'] for r in rows]
+          print(kinds)
+          first_bear = kinds.index('bear_detected')
+          hold = kinds.index('safe_hold')
+          between = kinds[first_bear:hold]
+          # after the first bear: every retreat candidate is tried and fails, the robot never resumes on its own
+          assert between.count('retreat') >= 2 and between.count('retreat') == between.count('retreat_failed'), between
+          assert 'navigate' not in between and 'retreat_done' not in between, between
+          assert kinds[hold + 1] == 'operator_command', kinds[hold:hold + 3]
+          assert kinds[-1] == 'mission_completed'
+          PY
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:

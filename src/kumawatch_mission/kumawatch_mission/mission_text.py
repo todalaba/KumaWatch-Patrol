@@ -38,7 +38,15 @@ def format_event(ev):
     if kind == 'retreat_done':
         return 'Safe point reached'
     if kind == 'retreat_failed':
-        return 'Safe point not reachable, continuing patrol'
+        if d.get('remaining'):
+            return 'Safe point not reachable, trying another safe point'
+        return 'Safe point not reachable'
+    if kind == 'safe_hold':
+        return 'SAFE HOLD: no reachable safe point, stopped and waiting for the operator'
+    if kind == 'operator_command':
+        return 'Operator command: %s' % d.get('command', '')
+    if kind == 'safe_hold_timeout':
+        return 'SAFE HOLD timed out: returning to base'
     if kind in ('unreachable', 'timeout'):
         return 'Goal %s/%s %s: %s' % (idx, total, ev.get('point_id', ''), kind)
     if kind == 'return_to_base':
