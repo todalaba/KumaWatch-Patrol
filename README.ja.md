@@ -84,13 +84,25 @@ stateDiagram-v2
     PATROL --> EMERGENCY_STOP: 熊を検知
     OBSERVE --> EMERGENCY_STOP: 熊を検知
     EMERGENCY_STOP --> RETREAT: 停止・記録
-    RETREAT --> PATROL: 安全地点に到着(経路なしの場合も*)、次の地点
+    RETREAT --> RETREAT: 経路なし、代替の安全地点へ*
+    RETREAT --> PATROL: 安全地点に到着、次の地点
+    RETREAT --> SAFE_HOLD: 行ける安全地点がない*
+    SAFE_HOLD --> PATROL: 管理者の指示 resume
+    SAFE_HOLD --> RETURN_TO_BASE: 管理者の指示 return
     PATROL --> RETURN_TO_BASE: 全地点を巡回
     RETURN_TO_BASE --> FINISHED: 詰所に帰還・結果表示
 ```
 
-\* `on_bear:=retreat`（既定）の場合。安全地点への経路を Nav2 が作れないとき、本試作は次の地点へ進みます。
-これは安全制御上の課題です（[8 章](#8-既知の制約)）。`on_bear:=continue` では `EMERGENCY_STOP` から直接次の地点へ進みます。
+\* `on_bear:=retreat`（既定）の場合。熊の真反対 3 m の安全地点へ Nav2 が行けないときは、向きを ±45°・±90° 変えた代替の安全地点を
+順に試します（熊から離れる候補のみ）。どれにも行けなければ **`SAFE_HOLD`** に入り、その場で停止したまま `/kumawatch/operator_alert` に
+通知を出し、`/kumawatch/operator_command` で管理者の指示（`resume` / `return` / `finish`）を待ちます。
+
+```bash
+ros2 topic pub --once /kumawatch/operator_command std_msgs/String "{data: resume}"
+```
+
+`on_retreat_fail:=continue` にすると、動画とレポートの走行時の動作（次の地点へ進む）に戻ります。`safe_hold_timeout` を設定すると、
+その時間が過ぎたら詰所へ戻ります。`on_bear:=continue` では `EMERGENCY_STOP` から直接次の地点へ進みます。
 
 ### ノードとトピック
 
@@ -98,7 +110,7 @@ stateDiagram-v2
 |---|---|---|
 | `risk_predictor` | 地点ごとのリスクを配信 | TTM の予測 CSV → `/kumawatch/risk_scores`, `/kumawatch/risk_markers` |
 | `bear_detector` | カメラ画像を YOLOv8 で判定し、LiDAR で距離を測って地図上の位置を推定 | `/camera/image_raw`, `/camera/camera_info`, `/scan`, `/tf` → `/kumawatch/bear_detection`, `/kumawatch/detection_image` |
-| `mission_planner` | 地点選択・巡回順決定・巡回・停止と退避・結果表示 | `/kumawatch/risk_scores`, `/kumawatch/bear_detection`, `/odom` → `navigate_to_pose`, `/cmd_vel`, `/kumawatch/patrol_markers`, `/kumawatch/patrol_summary`, `/kumawatch/mission_status` |
+| `mission_planner` | 地点選択・巡回順決定・巡回・停止と退避・`SAFE_HOLD`・結果表示 | `/kumawatch/risk_scores`, `/kumawatch/bear_detection`, `/odom`, `/kumawatch/operator_command` → `navigate_to_pose`, `/cmd_vel`, `/kumawatch/patrol_markers`, `/kumawatch/patrol_summary`, `/kumawatch/mission_status`, `/kumawatch/operator_alert` |
 | `bear_proximity_monitor` | 熊の既知座標との距離で検知する簡易版（動作確認用） | `/tf` → `/kumawatch/bear_detection` |
 | `fake_nav2` | Gazebo・Nav2 なしで流れを確かめる簡易シミュレータ | `navigate_to_pose` サーバ, `/tf`, `/odom` |
 | `image_recorder` | カメラ映像を状態表示付きで MP4 に録画、熊検知時の静止画を保存 | 画像トピック, `/kumawatch/mission_status`, `/kumawatch/bear_detection` → MP4 / JPEG |
@@ -178,7 +190,7 @@ sudo apt install ros-humble-gazebo-ros-pkgs ros-humble-navigation2 ros-humble-na
                  ros-humble-turtlebot3 ros-humble-turtlebot3-gazebo python3-colcon-common-extensions
 # ワークスペース
 mkdir -p ~/kumawatch_ws && cd ~/kumawatch_ws
-git clone https://github.com/Global-jogasaki/kumawatch-patrol.git src/KumaRobot
+git clone https://github.com/todalaba/KumaWatch-Patrol.git src/KumaRobot
 pip3 install --user -r src/KumaRobot/requirements.txt
 source /opt/ros/humble/setup.bash
 colcon build --symlink-install
@@ -200,6 +212,7 @@ ros2 launch kumawatch_mission kumawatch_patrol.launch.py strategy:=fixed    # �
 | `risk_mode` | `ttm` | `ttm`（KumaWatch の TTM の予測）/ `simulated`（模擬データのロジスティック回帰）/ `model` |
 | `detector` | `camera` | `camera`（カメラ画像の YOLOv8）/ `proximity`（既知座標との距離） |
 | `on_bear` | `retreat` | 熊の検知後：`retreat`（3 m 離れた安全地点へ退避して次へ）/ `continue` / `finish`（打ち切って帰還） |
+| （パラメータ）`on_retreat_fail` | `hold` | 行ける安全地点がないとき：`hold`（`SAFE_HOLD` で管理者の指示を待つ）/ `continue`（記録した走行と同じ）。`config/mission_params.yaml` で設定 |
 | `robot_model` | `waffle` | `waffle` / `waffle_pi` / `happy_mini` |
 | `record` | `false` | `true` でカメラ映像と検出映像を録画（[docs/recording.md](docs/recording.md)） |
 | `nav2_delay` | `5.0` | Nav2 の起動を待つ秒数（重い PC では増やす） |
@@ -261,7 +274,9 @@ P4 へ向かう途中で 2 頭目を検知し（0.82、3.9 m）、停止・記�
 > 2. **固定ルートの 2 頭目は、P3 から P4 付近の熊を偶然検知したものです。** 固定ルートは P4 を巡回対象にしていません。
 >    AI ルートは P4 を明示的な巡回対象として確認しました。
 > 3. **P2 では、安全地点への経路生成に失敗しました**（退避先が建物のそば）。本試作は巡回を続けましたが、
->    **実運用では安全停止と管理者への通知を優先する必要があります。** これは今後修正すべき安全制御上の課題です。
+>    **実運用では安全停止と管理者への通知を優先する必要があります。** この走行のあと、代替の安全地点の再探索と `SAFE_HOLD`
+>    （安全停止・通知・指示待ち）を実装しました（[2 章](#2-システム構成)の状態遷移）。簡易シミュレータでの CI では確認済みですが、
+>    Gazebo での再走行はまだです。
 
 固定ルートは 2 回走らせ、1 回目は P2 で退避したあと経路計画が行き詰まり、帰還できませんでした（熊 1 頭）。表は 2 回目の値です。
 距離は `mission_planner` が記録した値です。
@@ -278,8 +293,9 @@ P4 へ向かう途中で 2 頭目を検知し（0.82、3.9 m）、停止・記�
 
 ## 8. 既知の制約
 
-- **退避できない場合の安全制御。** P2 のように、熊の近くで通常の巡回に戻る遷移は安全設計として弱いです。安全停止・代替退避地点の再探索・
-  管理者への通知・人による判断までの待機のいずれかに遷移させる必要があります。
+- **退避できない場合の安全制御。** 記録した走行では、P2 で熊の近くのまま通常の巡回に戻りました（安全設計として弱い）。
+  その後、代替の安全地点の再探索と `SAFE_HOLD` に置き換えましたが、確認は簡易シミュレータでのみです。
+  安全地点は Nav2 に 1 つずつ送って試しており（事前の経路確認はしていない）、管理者への通知も ROS のトピックで、実際の連絡手段ではありません。
 - **評価の回数。** 各条件 1 回の走行で、統計的な比較はしていません。
 - **シミュレーションのみ。** 実環境での自己位置推定・通信・天候の影響は検証していません。
 - **熊判定** は基本図形の Gazebo の熊でのみ学習・評価しました。実物の画像での精度は不明です。
@@ -288,7 +304,7 @@ P4 へ向かう途中で 2 頭目を検知し（0.82、3.9 m）、停止・記�
 
 ## 9. 今後の課題
 
-- 退避できない場合の安全制御（安全停止・代替退避地点の再探索・管理者への通知・人の判断を待つ待機）
+- `SAFE_HOLD` を入れた状態での Gazebo の再走行、移動前の Nav2 による経路確認、通知を実際の連絡手段につなぐこと
 - Happy Mini のカメラへの車体の映り込みの修正
 - TTM・GLM-Logit・静的予測の巡回結果の比較（KumaWatch の他モデルの予測も同じ CSV 形式で取り込める）
 - 熊の配置と初期条件を変えた複数回の評価、複数回試行での発見率の比較
@@ -356,10 +372,14 @@ python3 scripts/offline_dry_run.py --plot docs/overview.png   # ROS なしの比
 
 - ワールドと地図は同じ `world_layout.yaml` から生成するので、SLAM なしで座標が一致します。
   熊とシカは地図に載せず、ロボットが LiDAR とカメラで見つけます。
-- GitHub Actions（`.github/workflows/ci.yml`）が ROS 2 Humble 上でビルド・テスト・`dry_run`（退避を含む）を確認します。
+- GitHub Actions（`.github/workflows/ci.yml`）が ROS 2 Humble 上でビルド・テスト・`dry_run`（退避と、安全地点に行けない場合の `SAFE_HOLD` を含む）を確認します。
 - 動画の撮影と編集：[docs/recording.md](docs/recording.md)、[docs/video_plan.md](docs/video_plan.md)。
   以前の画面全体の録画は <https://www.youtube.com/watch?v=n9ImQzJf8u0>。
-- 下書き用のレポートのひな形も残しています：[docs/report/KumaWatch_Patrol_report.pdf](docs/report/KumaWatch_Patrol_report.pdf)。
+
+## 生成 AI の利用
+
+このリポジトリのコード・文書・レポート・動画用ツールの作成には、生成 AI（Anthropic の Claude）の支援を受けました。
+課題の設計、講義の環境での走行、結果の確認は提出者が行いました。
 
 ## License
 

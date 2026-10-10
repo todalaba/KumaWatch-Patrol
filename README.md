@@ -85,13 +85,26 @@ stateDiagram-v2
     PATROL --> EMERGENCY_STOP: bear detected
     OBSERVE --> EMERGENCY_STOP: bear detected
     EMERGENCY_STOP --> RETREAT: stopped and recorded
-    RETREAT --> PATROL: safe spot reached (or no path*), next site
+    RETREAT --> RETREAT: no path, try another safe spot*
+    RETREAT --> PATROL: safe spot reached, next site
+    RETREAT --> SAFE_HOLD: no reachable safe spot*
+    SAFE_HOLD --> PATROL: operator "resume"
+    SAFE_HOLD --> RETURN_TO_BASE: operator "return"
     PATROL --> RETURN_TO_BASE: all sites visited
     RETURN_TO_BASE --> FINISHED: back at base, results shown
 ```
 
-\* With `on_bear:=retreat` (the default). If Nav2 finds no path to the safe spot, the prototype currently goes on to the next site;
-this is a safety-control issue (see [§8](#8-known-limitations)). With `on_bear:=continue` the robot goes from `EMERGENCY_STOP` straight to the next site.
+\* With `on_bear:=retreat` (the default). If Nav2 cannot reach the safe spot (3 m straight away from the bear), the robot tries alternative
+safe spots turned by ±45° and ±90° (only those that take it farther from the bear). If none can be reached, it enters **`SAFE_HOLD`**: it stays
+stopped, publishes an alert on `/kumawatch/operator_alert` and waits for an operator command on `/kumawatch/operator_command`
+(`resume` / `return` / `finish`):
+
+```bash
+ros2 topic pub --once /kumawatch/operator_command std_msgs/String "{data: resume}"
+```
+
+`on_retreat_fail:=continue` restores the behaviour of the run shown in the video and report (go on to the next site), and `safe_hold_timeout`
+returns to the base after a set time. With `on_bear:=continue` the robot goes from `EMERGENCY_STOP` straight to the next site.
 
 ### Nodes and topics
 
@@ -99,7 +112,7 @@ this is a safety-control issue (see [§8](#8-known-limitations)). With `on_bear:
 |---|---|---|
 | `risk_predictor` | Publishes per-site risk | TTM forecast CSV → `/kumawatch/risk_scores`, `/kumawatch/risk_markers` |
 | `bear_detector` | Detects bears in camera images (YOLOv8), measures distance with LiDAR, estimates map position | `/camera/image_raw`, `/camera/camera_info`, `/scan`, `/tf` → `/kumawatch/bear_detection`, `/kumawatch/detection_image` |
-| `mission_planner` | Site selection, ordering, patrol, stopping and retreat, results | `/kumawatch/risk_scores`, `/kumawatch/bear_detection`, `/odom` → `navigate_to_pose`, `/cmd_vel`, `/kumawatch/patrol_markers`, `/kumawatch/patrol_summary`, `/kumawatch/mission_status` |
+| `mission_planner` | Site selection, ordering, patrol, stopping and retreat, `SAFE_HOLD`, results | `/kumawatch/risk_scores`, `/kumawatch/bear_detection`, `/odom`, `/kumawatch/operator_command` → `navigate_to_pose`, `/cmd_vel`, `/kumawatch/patrol_markers`, `/kumawatch/patrol_summary`, `/kumawatch/mission_status`, `/kumawatch/operator_alert` |
 | `bear_proximity_monitor` | Detects bears by distance to known coordinates (simple method for testing) | `/tf` → `/kumawatch/bear_detection` |
 | `fake_nav2` | Minimal simulator for checking the flow without Gazebo/Nav2 | `navigate_to_pose` server, `/tf`, `/odom` |
 | `image_recorder` | Records the camera to MP4 with a status overlay; saves a still when a bear is detected | image topic, `/kumawatch/mission_status`, `/kumawatch/bear_detection` → MP4 / JPEG |
@@ -179,7 +192,7 @@ sudo apt install ros-humble-gazebo-ros-pkgs ros-humble-navigation2 ros-humble-na
                  ros-humble-turtlebot3 ros-humble-turtlebot3-gazebo python3-colcon-common-extensions
 # workspace
 mkdir -p ~/kumawatch_ws && cd ~/kumawatch_ws
-git clone https://github.com/Global-jogasaki/kumawatch-patrol.git src/KumaRobot
+git clone https://github.com/todalaba/KumaWatch-Patrol.git src/KumaRobot
 pip3 install --user -r src/KumaRobot/requirements.txt
 source /opt/ros/humble/setup.bash
 colcon build --symlink-install
@@ -201,6 +214,7 @@ next site → return to base → results. A Docker setup is in [`docker/`](docke
 | `risk_mode` | `ttm` | `ttm` (KumaWatch TTM forecasts) / `simulated` (logistic regression on simulated data) / `model` |
 | `detector` | `camera` | `camera` (YOLOv8 on camera images) / `proximity` (distance to known coordinates) |
 | `on_bear` | `retreat` | After a bear: `retreat` (safe spot 3 m away, then continue) / `continue` / `finish` (end and return) |
+| (param) `on_retreat_fail` | `hold` | When no safe spot can be reached: `hold` (`SAFE_HOLD`, wait for the operator) / `continue` (as in the recorded run). Set in `config/mission_params.yaml` |
 | `robot_model` | `waffle` | `waffle` / `waffle_pi` / `happy_mini` |
 | `record` | `false` | `true` records the camera and detection video ([docs/recording.md](docs/recording.md)) |
 | `nav2_delay` | `5.0` | Wait before starting Nav2 [s] (increase on slow PCs) |
@@ -262,7 +276,9 @@ On the way to P4 it detected the second bear (0.82, 3.9 m), stopped, recorded it
 > 2. **The fixed route's second bear was the bear near P4, detected by chance from P3.** The fixed route does not include P4;
 >    the AI route checked P4 as an explicit patrol target.
 > 3. **At P2, path planning to the safe spot failed** (the spot was next to a building) and this prototype continued the patrol.
->    **In real operation a safe stop and a notification to the operator must take priority.** This is a safety-control issue still to be fixed.
+>    **In real operation a safe stop and a notification to the operator must take priority.** After this run, alternative safe spots and
+>    `SAFE_HOLD` were implemented (see the state machine in [§2](#2-system-architecture)); they are tested in CI with the minimal simulator
+>    but have not yet been re-run in Gazebo.
 
 The fixed route was run twice; in the first run path planning got stuck after the retreat at P2 and the robot could not return (1 bear).
 The table shows the second run. Distances are the values logged by `mission_planner`.
@@ -279,8 +295,9 @@ With `on_bear:=continue` and bears detected from known coordinates, the real Nav
 
 ## 8. Known limitations
 
-- **Safety control when the retreat is impossible.** Returning to normal patrol near a bear (as at P2) is a weak safety design. It should switch
-  to a safe stop, a search for another safe spot, a notification to the operator, or waiting for a human decision.
+- **Safety control when the retreat is impossible.** In the recorded run the robot returned to normal patrol near a bear (P2), a weak safety design.
+  This has since been replaced by alternative safe spots and `SAFE_HOLD`, which are verified only with the minimal simulator so far.
+  The safe spots are tried one by one through Nav2 (no path check in advance), and the operator interface is a ROS topic, not a real notification channel.
 - **Evaluation.** One run per condition; no statistical comparison.
 - **Simulation only.** Localisation, communication and weather in real environments have not been tested.
 - **Bear detection** was trained and evaluated only on Gazebo bears made of primitive shapes; accuracy on real images is unknown.
@@ -289,7 +306,7 @@ With `on_bear:=continue` and bears detected from known coordinates, the real Nav
 
 ## 9. Future work
 
-- Safety control for an impossible retreat (safe stop, another safe spot, operator notification, waiting for a human decision)
+- Re-run in Gazebo with `SAFE_HOLD`; check safe spots with Nav2's path planner before moving; connect the alert to a real notification channel
 - Fix the robot body appearing in Happy Mini's camera
 - Compare patrol results of TTM, GLM-Logit and the static prior (KumaWatch's other forecasts can be imported in the same CSV format)
 - Multiple runs with different bear placements and initial conditions; detection rates over repeated trials
@@ -357,10 +374,14 @@ python3 scripts/offline_dry_run.py --plot docs/overview.png   # comparison witho
 
 - The world and the map are generated from the same `world_layout.yaml`, so their coordinates match without SLAM.
   Bears and deer are not on the map; the robot finds them with the LiDAR and camera.
-- GitHub Actions (`.github/workflows/ci.yml`) checks the build, tests and `dry_run` (including the retreat) on ROS 2 Humble.
+- GitHub Actions (`.github/workflows/ci.yml`) checks the build, tests and `dry_run` (including the retreat and `SAFE_HOLD` when no safe spot is reachable) on ROS 2 Humble.
 - Recording and editing the video: [docs/recording.md](docs/recording.md), [docs/video_plan.md](docs/video_plan.md) (Japanese).
   The earlier full-screen recording is at <https://www.youtube.com/watch?v=n9ImQzJf8u0>.
-- A draft report template is also kept: [docs/report/KumaWatch_Patrol_report.pdf](docs/report/KumaWatch_Patrol_report.pdf).
+
+## Use of generative AI
+
+Generative AI (Anthropic's Claude) was used to help write the code, documentation, report and video tooling in this repository.
+The task design, the runs in the lecture environment and the checking of the results were done by the author.
 
 ## License
 
